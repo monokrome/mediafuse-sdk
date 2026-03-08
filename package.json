@@ -1,5 +1,5 @@
 {
-  "name": "@mediafuse/sdk",
+  "name": "mediafuse",
   "version": "0.1.0",
   "description": "Plugin SDK for MediaFuse stream overlays",
   "type": "module",
@@ -16,10 +16,13 @@
   ],
   "scripts": {
     "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
   },
   "license": "BSD-2-Clause",
   "repository": {
