@@ -9,7 +9,7 @@ import type {
 } from "../src/types.js";
 
 function createMockContext(
-  registerReturn = true,
+  acceptTypes: PluginType[] = ["data", "overlay"],
 ): PluginContext & { register: ReturnType<typeof vi.fn> } {
   const manifest: PluginManifest = {
     v: 1,
@@ -19,7 +19,7 @@ function createMockContext(
   };
 
   return {
-    register: vi.fn().mockReturnValue(registerReturn),
+    register: vi.fn((type: PluginType) => acceptTypes.includes(type)),
     manifest,
   };
 }
@@ -42,37 +42,45 @@ describe("definePlugin", () => {
     expect(typeof plugin).toBe("function");
   });
 
-  it("calls ctx.register with the provided types and callback", () => {
+  it("calls ctx.register once per type with the callback", () => {
     const callback: PluginRegistrationCallback = () => {};
-    const types: PluginType[] = ["overlay"];
-    const plugin = definePlugin(types, callback);
+    const plugin = definePlugin(["data", "overlay"], callback);
+    const ctx = createMockContext();
+
+    plugin(ctx);
+
+    expect(ctx.register).toHaveBeenCalledTimes(2);
+    expect(ctx.register).toHaveBeenCalledWith("data", callback);
+    expect(ctx.register).toHaveBeenCalledWith("overlay", callback);
+  });
+
+  it("calls register once for a single type", () => {
+    const callback: PluginRegistrationCallback = () => {};
+    const plugin = definePlugin(["overlay"], callback);
     const ctx = createMockContext();
 
     plugin(ctx);
 
     expect(ctx.register).toHaveBeenCalledOnce();
-    expect(ctx.register).toHaveBeenCalledWith(types, callback);
+    expect(ctx.register).toHaveBeenCalledWith("overlay", callback);
   });
 
-  it("passes multiple types through to register", () => {
-    const callback: PluginRegistrationCallback = () => {};
-    const types: PluginType[] = ["data", "overlay"];
-    const plugin = definePlugin(types, callback);
+  it("does not call register for an empty types array", () => {
+    const plugin = definePlugin([], () => {});
     const ctx = createMockContext();
 
     plugin(ctx);
 
-    expect(ctx.register).toHaveBeenCalledWith(types, callback);
+    expect(ctx.register).not.toHaveBeenCalled();
   });
 
-  it("passes an empty types array through to register", () => {
-    const callback: PluginRegistrationCallback = () => {};
-    const plugin = definePlugin([], callback);
+  it("returns registration results for all requested types", () => {
+    const plugin = definePlugin(["data", "overlay"], () => {});
     const ctx = createMockContext();
 
-    plugin(ctx);
+    const result = plugin(ctx);
 
-    expect(ctx.register).toHaveBeenCalledWith([], callback);
+    expect(result).toEqual({ data: true, overlay: true });
   });
 
   it("callback receives the plugin API when invoked by the host", () => {
@@ -83,9 +91,8 @@ describe("definePlugin", () => {
 
     const ctx = createMockContext();
     ctx.register.mockImplementation(
-      (_types: PluginType[], cb: PluginRegistrationCallback) => {
-        const api = createMockApi();
-        cb(api);
+      (_type: PluginType, cb: PluginRegistrationCallback) => {
+        cb(createMockApi());
         return true;
       },
     );
@@ -106,9 +113,8 @@ describe("definePlugin", () => {
     const ctx = createMockContext();
     let capturedCleanup: (() => void) | void;
     ctx.register.mockImplementation(
-      (_types: PluginType[], cb: PluginRegistrationCallback) => {
-        const api = createMockApi();
-        capturedCleanup = cb(api);
+      (_type: PluginType, cb: PluginRegistrationCallback) => {
+        capturedCleanup = cb(createMockApi());
         return true;
       },
     );
@@ -128,7 +134,7 @@ describe("definePlugin", () => {
     const ctx = createMockContext();
     let capturedCleanup: (() => void) | void;
     ctx.register.mockImplementation(
-      (_types: PluginType[], cb: PluginRegistrationCallback) => {
+      (_type: PluginType, cb: PluginRegistrationCallback) => {
         capturedCleanup = cb(createMockApi());
         return true;
       },
@@ -150,5 +156,104 @@ describe("definePlugin", () => {
 
     expect(ctx1.register).toHaveBeenCalledOnce();
     expect(ctx2.register).toHaveBeenCalledOnce();
+  });
+
+  describe("type rejection", () => {
+    it("returns false for rejected types, true for accepted", () => {
+      const plugin = definePlugin(["data", "overlay"], () => {});
+      const ctx = createMockContext(["data"]);
+
+      const result = plugin(ctx);
+
+      expect(result).toEqual({ data: true, overlay: false });
+    });
+
+    it("returns false for all types when fully rejected", () => {
+      const plugin = definePlugin(["data", "overlay"], () => {});
+      const ctx = createMockContext([]);
+
+      const result = plugin(ctx);
+
+      expect(result).toEqual({ data: false, overlay: false });
+    });
+
+    it("returns only overlay accepted when data is rejected", () => {
+      const plugin = definePlugin(["data", "overlay"], () => {});
+      const ctx = createMockContext(["overlay"]);
+
+      const result = plugin(ctx);
+
+      expect(result).toEqual({ data: false, overlay: true });
+    });
+
+    it("defaults unrequested types to false in the result", () => {
+      const plugin = definePlugin(["data"], () => {});
+      const ctx = createMockContext();
+
+      const result = plugin(ctx);
+
+      expect(result.data).toBe(true);
+      expect(result.overlay).toBe(false);
+    });
+
+    it("still registers each type even if earlier types were rejected", () => {
+      const callback: PluginRegistrationCallback = () => {};
+      const plugin = definePlugin(["data", "overlay"], callback);
+      const ctx = createMockContext(["overlay"]);
+
+      plugin(ctx);
+
+      expect(ctx.register).toHaveBeenCalledTimes(2);
+      expect(ctx.register).toHaveBeenCalledWith("data", callback);
+      expect(ctx.register).toHaveBeenCalledWith("overlay", callback);
+    });
+  });
+
+  describe("error propagation", () => {
+    it("propagates errors thrown by the callback", () => {
+      const plugin = definePlugin(["overlay"], () => {
+        throw new Error("plugin init failed");
+      });
+
+      const ctx = createMockContext();
+      ctx.register.mockImplementation(
+        (_type: PluginType, cb: PluginRegistrationCallback) => {
+          cb(createMockApi());
+          return true;
+        },
+      );
+
+      expect(() => plugin(ctx)).toThrow("plugin init failed");
+    });
+
+    it("propagates errors thrown by the cleanup function", () => {
+      const plugin = definePlugin(["data"], () => {
+        return () => {
+          throw new Error("cleanup failed");
+        };
+      });
+
+      const ctx = createMockContext();
+      let capturedCleanup: (() => void) | void;
+      ctx.register.mockImplementation(
+        (_type: PluginType, cb: PluginRegistrationCallback) => {
+          capturedCleanup = cb(createMockApi());
+          return true;
+        },
+      );
+
+      plugin(ctx);
+      expect(() => capturedCleanup!()).toThrow("cleanup failed");
+    });
+
+    it("propagates errors thrown by register itself", () => {
+      const plugin = definePlugin(["overlay"], () => {});
+      const ctx = createMockContext();
+      ctx.register.mockImplementation(() => {
+        throw new Error("registration rejected");
+      });
+
+      expect(() => plugin(ctx)).toThrow("registration rejected");
+    });
   });
 });

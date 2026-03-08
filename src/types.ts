@@ -53,7 +53,7 @@ export interface PluginManifest {
 }
 
 export type RegisterFn = (
-  types: PluginType[],
+  type: PluginType,
   callback: PluginRegistrationCallback,
 ) => boolean;
 

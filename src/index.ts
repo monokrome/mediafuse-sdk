@@ -1,4 +1,5 @@
 export { definePlugin } from "./define-plugin.js";
+export type { RegistrationResult } from "./define-plugin.js";
 
 export type {
   StoredMessage,

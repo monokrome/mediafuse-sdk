@@ -116,8 +116,11 @@ describe("type contracts", () => {
     expect(manifest.plugins).toHaveLength(1);
   });
 
-  it("RegisterFn accepts types and callback, returns boolean", () => {
+  it("RegisterFn accepts a single type and callback, returns boolean", () => {
     expectTypeOf<RegisterFn>().toBeFunction();
+    expectTypeOf<RegisterFn>().parameters.toEqualTypeOf<
+      [PluginType, PluginRegistrationCallback]
+    >();
     expectTypeOf<ReturnType<RegisterFn>>().toEqualTypeOf<boolean>();
   });
 

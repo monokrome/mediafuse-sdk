@@ -1,15 +1,20 @@
 import type {
   PluginType,
-  PluginApi,
   PluginContext,
   PluginRegistrationCallback,
 } from "./types.js";
 
+export type RegistrationResult = Record<PluginType, boolean>;
+
 export function definePlugin(
   types: PluginType[],
   callback: PluginRegistrationCallback,
-): (ctx: PluginContext) => void {
+): (ctx: PluginContext) => RegistrationResult {
   return (ctx) => {
-    ctx.register(types, callback);
+    const result: RegistrationResult = { data: false, overlay: false };
+    for (const type of types) {
+      result[type] = ctx.register(type, callback);
+    }
+    return result;
   };
 }
