@@ -1,5 +1,4 @@
-export { definePlugin } from "./define-plugin.js";
-export type { RegistrationResult } from "./define-plugin.js";
+export type { DefinePluginFn, SetupFn } from "./define-plugin.js";
 
 export type {
   StoredMessage,
@@ -8,8 +7,8 @@ export type {
   PluginType,
   PluginEvent,
   PluginEventMap,
-  PluginApi,
-  PluginRegistrationCallback,
+  CreateContext,
+  PluginHandlers,
   PluginEntry,
   PluginManifest,
   RegisterFn,

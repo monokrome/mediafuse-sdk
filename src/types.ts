@@ -28,19 +28,23 @@ export type PluginEventMap = {
 
 export type PluginEvent = keyof PluginEventMap;
 
-export interface PluginApi {
-  on<E extends PluginEvent>(event: E, handler: (data: PluginEventMap[E]) => void): void;
-  off<E extends PluginEvent>(event: E, handler: (data: PluginEventMap[E]) => void): void;
+export interface CreateContext {
   container: HTMLDivElement | null;
+  config: Record<string, unknown>;
+  states: States;
   emit: (<E extends PluginEvent>(event: E, data: PluginEventMap[E]) => void) | null;
-  states(): States;
-  config(): Record<string, unknown>;
 }
 
-export type PluginRegistrationCallback = (api: PluginApi) => (() => void) | void;
+export type PluginHandlers = {
+  [E in PluginEvent as `on${Capitalize<E>}`]?: (data: PluginEventMap[E]) => void;
+} & {
+  onCreate?: (ctx: CreateContext) => void;
+  onDestroy?: () => void;
+};
 
 export interface PluginEntry {
   src: string;
+  name?: string;
   allowTypes?: PluginType[];
   config?: Record<string, unknown>;
 }
@@ -54,7 +58,7 @@ export interface PluginManifest {
 
 export type RegisterFn = (
   type: PluginType,
-  callback: PluginRegistrationCallback,
+  handlers: PluginHandlers,
 ) => boolean;
 
 export interface PluginContext {

@@ -6,8 +6,8 @@ import type {
   PluginType,
   PluginEvent,
   PluginEventMap,
-  PluginApi,
-  PluginRegistrationCallback,
+  PluginHandlers,
+  PluginHandle,
   PluginEntry,
   PluginManifest,
   RegisterFn,
@@ -76,27 +76,29 @@ describe("type contracts", () => {
     expectTypeOf<PluginEventMap["config"]>().toEqualTypeOf<PluginManifest>();
   });
 
-  it("PluginApi has on/off with typed event handlers", () => {
-    expectTypeOf<PluginApi["on"]>().toBeFunction();
-    expectTypeOf<PluginApi["off"]>().toBeFunction();
-    expectTypeOf<PluginApi["states"]>().toBeFunction();
-    expectTypeOf<PluginApi["config"]>().toBeFunction();
-    expectTypeOf<PluginApi["container"]>().toEqualTypeOf<HTMLDivElement | null>();
+  it("PluginHandlers uses onEventName convention", () => {
+    const handlers: PluginHandlers = {
+      onMessage: () => {},
+      onTick: () => {},
+      onDestroy: () => {},
+    };
+    expect(handlers.onMessage).toBeDefined();
+    expect(handlers.onTick).toBeDefined();
+    expect(handlers.onDestroy).toBeDefined();
   });
 
-  it("PluginRegistrationCallback accepts PluginApi and optionally returns cleanup", () => {
-    expectTypeOf<PluginRegistrationCallback>().toBeFunction();
-    expectTypeOf<PluginRegistrationCallback>().parameters.toEqualTypeOf<
-      [PluginApi]
-    >();
-    expectTypeOf<ReturnType<PluginRegistrationCallback>>().toEqualTypeOf<
-      (() => void) | void
-    >();
+  it("PluginHandle provides container, emit, states, and config", () => {
+    expectTypeOf<PluginHandle>().toHaveProperty("container");
+    expectTypeOf<PluginHandle>().toHaveProperty("emit");
+    expectTypeOf<PluginHandle>().toHaveProperty("states");
+    expectTypeOf<PluginHandle>().toHaveProperty("config");
+    expectTypeOf<PluginHandle["container"]>().toEqualTypeOf<HTMLDivElement | null>();
   });
 
-  it("PluginEntry has src and optional allowTypes/config", () => {
+  it("PluginEntry has src and optional name/allowTypes/config", () => {
     const entry: PluginEntry = { src: "http://example.com/plugin.js" };
     expect(entry.src).toBe("http://example.com/plugin.js");
+    expectTypeOf<PluginEntry["name"]>().toEqualTypeOf<string | undefined>();
     expectTypeOf<PluginEntry["allowTypes"]>().toEqualTypeOf<
       PluginType[] | undefined
     >();
@@ -116,12 +118,12 @@ describe("type contracts", () => {
     expect(manifest.plugins).toHaveLength(1);
   });
 
-  it("RegisterFn accepts a single type and callback, returns boolean", () => {
+  it("RegisterFn accepts a single type and handlers, returns handle or null", () => {
     expectTypeOf<RegisterFn>().toBeFunction();
     expectTypeOf<RegisterFn>().parameters.toEqualTypeOf<
-      [PluginType, PluginRegistrationCallback]
+      [PluginType, PluginHandlers]
     >();
-    expectTypeOf<ReturnType<RegisterFn>>().toEqualTypeOf<boolean>();
+    expectTypeOf<ReturnType<RegisterFn>>().toEqualTypeOf<PluginHandle | null>();
   });
 
   it("PluginContext provides register and manifest", () => {
