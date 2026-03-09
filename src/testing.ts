@@ -83,6 +83,7 @@ export function createTestHarness(
         container,
         config: pluginConfig,
         emit: emitFn,
+        dev: true,
       });
     }
 
