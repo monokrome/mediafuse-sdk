@@ -7,13 +7,10 @@ export interface StoredMessage<T = Record<string, unknown>> {
 
 export type MessageOf<T> = StoredMessage<T> & { type: string };
 
-export type States = Record<string, Record<string, unknown>>;
-
 export type PluginType = "data" | "overlay";
 
 export type PluginEventMap = {
   message: StoredMessage | null;
-  stateChange: States;
   command: { name: string; data: unknown };
   resize: { width: number; height: number };
   tick: number;
@@ -25,7 +22,6 @@ export type PluginEvent = keyof PluginEventMap;
 export interface CreateContext {
   container: HTMLDivElement | null;
   config: Record<string, unknown>;
-  states: States;
   emit: (<E extends PluginEvent>(event: E, data: PluginEventMap[E]) => void) | null;
 }
 

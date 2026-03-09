@@ -2,7 +2,6 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 import type {
   StoredMessage,
   MessageOf,
-  States,
   PluginType,
   PluginEvent,
   PluginEventMap,
@@ -22,7 +21,6 @@ describe("type contracts", () => {
   it("PluginEvent covers all event map keys", () => {
     expectTypeOf<PluginEvent>().toEqualTypeOf<
       | "message"
-      | "stateChange"
       | "command"
       | "resize"
       | "tick"
@@ -62,17 +60,8 @@ describe("type contracts", () => {
     expectTypeOf<MusicMsg["data"]>().toEqualTypeOf<MusicData>();
   });
 
-  it("States is a nested record", () => {
-    const states: States = { section: { key: "value" } };
-    expect(states.section.key).toBe("value");
-    expectTypeOf<States>().toEqualTypeOf<
-      Record<string, Record<string, unknown>>
-    >();
-  });
-
   it("PluginEventMap maps events to correct payload types", () => {
     expectTypeOf<PluginEventMap["message"]>().toEqualTypeOf<StoredMessage | null>();
-    expectTypeOf<PluginEventMap["stateChange"]>().toEqualTypeOf<States>();
     expectTypeOf<PluginEventMap["command"]>().toEqualTypeOf<{
       name: string;
       data: unknown;
@@ -96,10 +85,9 @@ describe("type contracts", () => {
     expect(handlers.onDestroy).toBeDefined();
   });
 
-  it("CreateContext provides container, config, states, and emit", () => {
+  it("CreateContext provides container, config, and emit", () => {
     expectTypeOf<CreateContext>().toHaveProperty("container");
     expectTypeOf<CreateContext>().toHaveProperty("config");
-    expectTypeOf<CreateContext>().toHaveProperty("states");
     expectTypeOf<CreateContext>().toHaveProperty("emit");
     expectTypeOf<CreateContext["container"]>().toEqualTypeOf<HTMLDivElement | null>();
   });
