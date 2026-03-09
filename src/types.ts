@@ -7,7 +7,9 @@ export interface StoredMessage<T = Record<string, unknown>> {
 
 export type MessageOf<T> = StoredMessage<T> & { type: string };
 
-export type PluginType = "data" | "overlay";
+export type PluginType = "data" | "overlay" | "dashboard";
+
+export type PluginEnvironment = "overlay" | "dashboard";
 
 export type PluginEventMap = {
   message: StoredMessage | null;
@@ -23,6 +25,7 @@ export interface CreateContext {
   container: HTMLDivElement | null;
   config: Record<string, unknown>;
   emit: (<E extends PluginEvent>(event: E, data: PluginEventMap[E]) => void) | null;
+  environment: PluginEnvironment;
   dev: boolean;
 }
 
@@ -32,6 +35,11 @@ export type PluginHandlers = {
   onCreate?: (ctx: CreateContext) => void;
   onDestroy?: () => void;
 };
+
+export interface RegisterOptions {
+  environment?: PluginEnvironment;
+  dev?: boolean;
+}
 
 export interface PluginEntry {
   src: string;
@@ -50,6 +58,7 @@ export interface PluginManifest {
 export type RegisterFn = (
   type: PluginType,
   handlers: PluginHandlers,
+  options?: RegisterOptions,
 ) => boolean;
 
 export interface PluginContext {

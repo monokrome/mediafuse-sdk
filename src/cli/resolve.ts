@@ -18,7 +18,6 @@ export interface ResolvedManifest {
 interface DiscoveredPlugin {
   name: string;
   src: string;
-  allowTypes?: string[];
 }
 
 export function resolveManifest(
@@ -120,27 +119,22 @@ function readPluginsFromPackage(
 
   if (!plugins) return [];
 
-  // Single-plugin package: mediafuse.plugins is not a map but a flat descriptor
-  if (plugins.src) {
-    const pkgName = pkg.name || basename(dir);
-    return [
-      {
-        name: pkgName,
-        src: resolve(dir, plugins.src),
-        allowTypes: plugins.allowTypes,
-      },
-    ];
+  const pkgName = pkg.name || basename(dir);
+
+  // String shorthand: mediafuse.plugins: "./src/index.ts"
+  if (typeof plugins === "string") {
+    return [{ name: pkgName, src: resolve(dir, plugins) }];
   }
 
-  // Multi-plugin package: mediafuse.plugins is a name → descriptor map
-  return Object.entries(plugins).map(([name, value]) => {
-    const meta = value as Record<string, unknown>;
-    return {
-      name,
-      src: resolve(dir, meta.src as string),
-      allowTypes: meta.allowTypes as string[] | undefined,
-    };
-  });
+  // List: mediafuse.plugins: ["./src/index.ts", "./src/other.ts"]
+  if (Array.isArray(plugins)) {
+    return plugins.map((p: string, i: number) => ({
+      name: i === 0 ? pkgName : `${pkgName}/${basename(p, ".ts").replace(/\.js$/, "")}`,
+      src: resolve(dir, p),
+    }));
+  }
+
+  return [];
 }
 
 function normalizeEntries(plugins: (string | PluginEntry)[]): PluginEntry[] {
@@ -227,11 +221,11 @@ function resolveFromNodeModules(ref: string, from: string): string {
   const plugins = mediafuse?.plugins;
 
   if (plugins) {
-    if (subPlugin && plugins[subPlugin]) {
-      return resolve(pkgDir, plugins[subPlugin].src);
+    if (typeof plugins === "string") {
+      return resolve(pkgDir, plugins);
     }
-    if (plugins.src) {
-      return resolve(pkgDir, plugins.src);
+    if (Array.isArray(plugins) && plugins.length > 0) {
+      return resolve(pkgDir, plugins[0]);
     }
   }
 
@@ -263,11 +257,8 @@ function mergeMetadata(
 
   const merged = { ...entry };
 
-  if (match) {
-    if (!merged.name) merged.name = match.name;
-    if (!merged.allowTypes && match.allowTypes) {
-      merged.allowTypes = match.allowTypes as PluginEntry["allowTypes"];
-    }
+  if (match && !merged.name) {
+    merged.name = match.name;
   }
 
   return merged;

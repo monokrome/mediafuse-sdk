@@ -5,6 +5,7 @@ import type {
   PluginHandlers,
   PluginManifest,
   CreateContext,
+  RegisterOptions,
 } from "./types.js";
 import type { DefinePluginFn } from "./define-plugin.js";
 
@@ -71,7 +72,7 @@ export function createTestHarness(
         }
       : null;
 
-  const register = (type: PluginType, handlers: PluginHandlers): boolean => {
+  const register = (type: PluginType, handlers: PluginHandlers, _options?: RegisterOptions): boolean => {
     if (type !== allowedType) return false;
 
     capturedType = type;
@@ -83,6 +84,7 @@ export function createTestHarness(
         container,
         config: pluginConfig,
         emit: emitFn,
+        environment: allowedType === "dashboard" ? "dashboard" : "overlay",
         dev: true,
       });
     }
