@@ -2,7 +2,7 @@ export type { DefinePluginFn, SetupFn } from "./define-plugin.js";
 
 export type {
   StoredMessage,
-  Track,
+  MessageOf,
   States,
   PluginType,
   PluginEvent,

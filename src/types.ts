@@ -1,16 +1,11 @@
-export interface StoredMessage {
-  title: string;
-  subtitle: string;
+export interface StoredMessage<T = Record<string, unknown>> {
   type: string | null;
+  data: T;
   timestamp: number;
   expiresAt: number | null;
 }
 
-export interface Track {
-  artist: string;
-  title: string;
-  album: string;
-}
+export type MessageOf<T> = StoredMessage<T> & { type: string };
 
 export type States = Record<string, Record<string, unknown>>;
 
@@ -18,7 +13,6 @@ export type PluginType = "data" | "overlay";
 
 export type PluginEventMap = {
   message: StoredMessage | null;
-  nowPlaying: Track | null;
   stateChange: States;
   command: { name: string; data: unknown };
   resize: { width: number; height: number };

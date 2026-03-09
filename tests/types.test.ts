@@ -1,13 +1,13 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import type {
   StoredMessage,
-  Track,
+  MessageOf,
   States,
   PluginType,
   PluginEvent,
   PluginEventMap,
   PluginHandlers,
-  PluginHandle,
+  CreateContext,
   PluginEntry,
   PluginManifest,
   RegisterFn,
@@ -22,7 +22,6 @@ describe("type contracts", () => {
   it("PluginEvent covers all event map keys", () => {
     expectTypeOf<PluginEvent>().toEqualTypeOf<
       | "message"
-      | "nowPlaying"
       | "stateChange"
       | "command"
       | "resize"
@@ -31,25 +30,36 @@ describe("type contracts", () => {
     >();
   });
 
-  it("StoredMessage has the expected shape", () => {
+  it("StoredMessage has the expected shape with generic data", () => {
     const msg: StoredMessage = {
-      title: "test",
-      subtitle: "sub",
       type: null,
+      data: { title: "test" },
       timestamp: Date.now(),
       expiresAt: null,
     };
-    expect(msg.title).toBe("test");
+    expect(msg.data.title).toBe("test");
     expectTypeOf(msg.type).toEqualTypeOf<string | null>();
+    expectTypeOf(msg.data).toEqualTypeOf<Record<string, unknown>>();
     expectTypeOf(msg.expiresAt).toEqualTypeOf<number | null>();
   });
 
-  it("Track has artist, title, and album", () => {
-    const track: Track = { artist: "a", title: "t", album: "al" };
-    expect(track.artist).toBe("a");
-    expectTypeOf<Track>().toHaveProperty("artist");
-    expectTypeOf<Track>().toHaveProperty("title");
-    expectTypeOf<Track>().toHaveProperty("album");
+  it("StoredMessage generic narrows data type", () => {
+    type MusicData = { artist: string; title: string };
+    const msg: StoredMessage<MusicData> = {
+      type: "music",
+      data: { artist: "a", title: "t" },
+      timestamp: Date.now(),
+      expiresAt: null,
+    };
+    expectTypeOf(msg.data).toEqualTypeOf<MusicData>();
+    expectTypeOf(msg.data.artist).toEqualTypeOf<string>();
+  });
+
+  it("MessageOf narrows data and requires type", () => {
+    type MusicData = { artist: string; title: string };
+    type MusicMsg = MessageOf<MusicData>;
+    expectTypeOf<MusicMsg["type"]>().toEqualTypeOf<string>();
+    expectTypeOf<MusicMsg["data"]>().toEqualTypeOf<MusicData>();
   });
 
   it("States is a nested record", () => {
@@ -62,7 +72,6 @@ describe("type contracts", () => {
 
   it("PluginEventMap maps events to correct payload types", () => {
     expectTypeOf<PluginEventMap["message"]>().toEqualTypeOf<StoredMessage | null>();
-    expectTypeOf<PluginEventMap["nowPlaying"]>().toEqualTypeOf<Track | null>();
     expectTypeOf<PluginEventMap["stateChange"]>().toEqualTypeOf<States>();
     expectTypeOf<PluginEventMap["command"]>().toEqualTypeOf<{
       name: string;
@@ -87,12 +96,12 @@ describe("type contracts", () => {
     expect(handlers.onDestroy).toBeDefined();
   });
 
-  it("PluginHandle provides container, emit, states, and config", () => {
-    expectTypeOf<PluginHandle>().toHaveProperty("container");
-    expectTypeOf<PluginHandle>().toHaveProperty("emit");
-    expectTypeOf<PluginHandle>().toHaveProperty("states");
-    expectTypeOf<PluginHandle>().toHaveProperty("config");
-    expectTypeOf<PluginHandle["container"]>().toEqualTypeOf<HTMLDivElement | null>();
+  it("CreateContext provides container, config, states, and emit", () => {
+    expectTypeOf<CreateContext>().toHaveProperty("container");
+    expectTypeOf<CreateContext>().toHaveProperty("config");
+    expectTypeOf<CreateContext>().toHaveProperty("states");
+    expectTypeOf<CreateContext>().toHaveProperty("emit");
+    expectTypeOf<CreateContext["container"]>().toEqualTypeOf<HTMLDivElement | null>();
   });
 
   it("PluginEntry has src and optional name/allowTypes/config", () => {
@@ -118,12 +127,12 @@ describe("type contracts", () => {
     expect(manifest.plugins).toHaveLength(1);
   });
 
-  it("RegisterFn accepts a single type and handlers, returns handle or null", () => {
+  it("RegisterFn accepts a single type and handlers, returns boolean", () => {
     expectTypeOf<RegisterFn>().toBeFunction();
     expectTypeOf<RegisterFn>().parameters.toEqualTypeOf<
       [PluginType, PluginHandlers]
     >();
-    expectTypeOf<ReturnType<RegisterFn>>().toEqualTypeOf<PluginHandle | null>();
+    expectTypeOf<ReturnType<RegisterFn>>().toEqualTypeOf<boolean>();
   });
 
   it("PluginContext provides register and manifest", () => {
