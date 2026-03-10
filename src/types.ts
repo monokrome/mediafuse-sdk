@@ -2,7 +2,7 @@ export interface StoredMessage<T = Record<string, unknown>> {
   type: string | null;
   data: T;
   timestamp: number;
-  expiresAt: number | null;
+  durationMs: number | null;
 }
 
 export type MessageOf<T> = StoredMessage<T> & { type: string };
