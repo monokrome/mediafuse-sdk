@@ -10,7 +10,8 @@ const USAGE = `Usage: mediafuse [-p path ...] [--port N] [manifest.json]
 
 Serve a MediaFuse manifest and its plugins locally.
 
-If no manifest is given, looks for mediafuse.manifest in package.json.
+If no manifest is given, checks mediafuse.manifest in package.json,
+then falls back to manifest.json in the current directory.
 
 Options:
   -p, --plugin path   Plugin search path (repeatable)
@@ -39,7 +40,7 @@ if (positionals.length > 1) {
 
 const manifestPath = positionals.length === 1
   ? resolve(positionals[0])
-  : findManifestFromPackageJson();
+  : findManifest();
 
 if (!existsSync(manifestPath)) {
   console.error(`Manifest not found: ${manifestPath}`);
@@ -54,21 +55,19 @@ const searchPaths = (values.plugin as string[]).map((p) => resolve(p));
 const resolved = resolveManifest(manifestData, manifestDir, searchPaths, port);
 startServer(resolved, port);
 
-function findManifestFromPackageJson(): string {
+function findManifest(): string {
+  // Check package.json for mediafuse.manifest
   const pkgPath = join(process.cwd(), "package.json");
-
-  if (!existsSync(pkgPath)) {
-    console.error("No manifest argument and no package.json in current directory");
-    process.exit(1);
+  if (existsSync(pkgPath)) {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    const manifestRef = pkg.mediafuse?.manifest;
+    if (manifestRef) return resolve(process.cwd(), manifestRef);
   }
 
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-  const manifestRef = pkg.mediafuse?.manifest;
+  // Fall back to manifest.json in cwd
+  const defaultPath = join(process.cwd(), "manifest.json");
+  if (existsSync(defaultPath)) return defaultPath;
 
-  if (!manifestRef) {
-    console.error("No manifest argument and no mediafuse.manifest in package.json");
-    process.exit(1);
-  }
-
-  return resolve(process.cwd(), manifestRef);
+  console.error("No manifest found. Provide a path, set mediafuse.manifest in package.json, or add a manifest.json");
+  process.exit(1);
 }
