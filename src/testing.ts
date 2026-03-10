@@ -84,6 +84,7 @@ export function createTestHarness(
         container,
         config: pluginConfig,
         emit: emitFn,
+        messageActioned: () => {},
         environment: allowedType === "dashboard" ? "dashboard" : "overlay",
         dev: true,
       });
