@@ -49,10 +49,45 @@ export interface PluginEntry {
   config?: Record<string, unknown>;
 }
 
+export interface BlockPosition {
+  x?: number | string;
+  y?: number | string;
+  anchor?: {
+    x?: "left" | "center" | "right";
+    y?: "top" | "center" | "bottom";
+  };
+}
+
+export interface BlockCondition {
+  event?: string;
+  duration?: number;
+}
+
+export interface BlockConditions {
+  enter?: BlockCondition[];
+  exit?: BlockCondition[];
+}
+
+export interface BlockAnimation {
+  enter?: string;
+  exit?: string;
+  duration?: number;
+}
+
+export interface Block {
+  id: string;
+  type: "iframe" | "template";
+  provider?: string;
+  position?: BlockPosition;
+  options: Record<string, unknown>;
+  conditions?: BlockConditions;
+  animation?: BlockAnimation;
+}
+
 export interface PluginManifest {
   v: number;
   plugins: PluginEntry[];
-  blocks: unknown[];
+  blocks: Block[];
   config: Record<string, unknown>;
 }
 
