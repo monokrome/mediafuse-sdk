@@ -74,10 +74,14 @@ export interface BlockAnimation {
   duration?: number;
 }
 
+export type BlockTypeRenderer<T = unknown> = (
+  options: Record<string, unknown>,
+  context: Record<string, unknown>,
+) => T;
+
 export interface Block {
   id: string;
-  type: "iframe" | "template";
-  provider?: string;
+  type: string;
   position?: BlockPosition;
   options: Record<string, unknown>;
   conditions?: BlockConditions;
@@ -97,7 +101,13 @@ export type RegisterFn = (
   options?: RegisterOptions,
 ) => boolean;
 
+export type RegisterBlockTypeFn = (
+  subtype: string,
+  renderer: BlockTypeRenderer,
+) => void;
+
 export interface PluginContext {
   register: RegisterFn;
+  registerBlockType: RegisterBlockTypeFn;
   manifest: PluginManifest;
 }

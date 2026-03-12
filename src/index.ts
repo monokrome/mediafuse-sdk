@@ -15,8 +15,10 @@ export type {
   BlockCondition,
   BlockConditions,
   BlockAnimation,
+  BlockTypeRenderer,
   Block,
   PluginManifest,
   RegisterFn,
+  RegisterBlockTypeFn,
   PluginContext,
 } from "./types.js";

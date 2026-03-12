@@ -95,7 +95,7 @@ export function createTestHarness(
 
   const definePlugin: DefinePluginFn = (name, setup) => {
     capturedName = name;
-    setup({ register, manifest });
+    setup({ register, registerBlockType: () => {}, manifest });
   };
 
   const pluginFn = typeof plugin === "function" ? plugin : plugin.default;
