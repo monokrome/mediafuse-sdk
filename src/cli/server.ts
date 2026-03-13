@@ -1,8 +1,10 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, createReadStream, existsSync } from "node:fs";
-import { join, extname, resolve, sep } from "node:path";
+import { join, extname, resolve, dirname, basename, sep } from "node:path";
+import { createHash } from "node:crypto";
 import { transform } from "esbuild";
 import type { ResolvedManifest } from "./resolve.js";
+import { resolveRef } from "./remote.js";
 
 const MIME: Record<string, string> = {
   ".js": "application/javascript",
@@ -30,9 +32,106 @@ const MIME: Record<string, string> = {
 
 const TS_EXTENSIONS = new Set([".ts", ".tsx"]);
 
-export function startServer(resolved: ResolvedManifest, port: number): void {
+type RouteHandler = (req: IncomingMessage, res: ServerResponse, match: RegExpExecArray) => Promise<void> | void;
+
+function baseUrl(req: IncomingMessage, port: number): string {
+  const host = req.headers.host || `localhost:${port}`;
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  return `${proto}://${host}`;
+}
+
+export interface ServerOptions {
+  cache?: boolean;
+}
+
+export function startServer(resolved: ResolvedManifest, port: number, options: ServerOptions = {}): void {
+  const cacheControl = options.cache ? "public, max-age=300" : "no-store";
   const { manifest, plugins, staticRoot } = resolved;
-  const manifestJson = JSON.stringify(manifest, null, 2);
+
+  // Dynamic resolution: maps hash IDs to local directories
+  const dynMap = new Map<string, { localDir: string; filename: string }>();
+
+  function dynId(specifier: string): string {
+    return createHash("sha256").update(specifier).digest("hex").slice(0, 12);
+  }
+
+  const routes: [RegExp, RouteHandler][] = [
+    [/^\/$/, (req, res) => {
+      const base = baseUrl(req, port);
+      const rewritten = rewriteManifestUrls(manifest, base);
+      res.setHeader("Content-Type", "application/json");
+      res.writeHead(200);
+      res.end(JSON.stringify(rewritten, null, 2));
+    }],
+    [/^\/_resolve$/, async (req, res) => {
+      const url = new URL(req.url || "/", `http://localhost:${port}`);
+      const src = url.searchParams.get("src");
+      if (!src) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: "Missing src parameter" }));
+        return;
+      }
+
+      try {
+        const filePath = await resolveRef(src);
+        const id = dynId(src);
+        const localDir = dirname(filePath);
+        const filename = basename(filePath);
+        dynMap.set(id, { localDir, filename });
+
+        const base = baseUrl(req, port);
+        const resolvedUrl = `${base}/_dyn/${id}/${filename}`;
+
+        res.setHeader("Content-Type", "application/json");
+        res.writeHead(200);
+        res.end(JSON.stringify({ url: resolvedUrl }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: msg }));
+      }
+    }],
+    [/^\/_dyn\/([a-f0-9]+)\/(.+)$/, async (_req, res, match) => {
+      const entry = dynMap.get(match[1]);
+      if (!entry) {
+        res.writeHead(404);
+        res.end("Not found");
+        return;
+      }
+      const filePath = safePath(entry.localDir, match[2]);
+      if (!filePath) {
+        res.writeHead(403);
+        res.end("Forbidden");
+        return;
+      }
+      await serveFile(filePath, res);
+    }],
+    [/^\/(\d+)\/(.+)$/, async (_req, res, match) => {
+      const idx = parseInt(match[1], 10);
+      const plugin = plugins[idx];
+      if (!plugin) {
+        res.writeHead(404);
+        res.end("Plugin not found");
+        return;
+      }
+      const filePath = safePath(plugin.localDir, match[2]);
+      if (!filePath) {
+        res.writeHead(403);
+        res.end("Forbidden");
+        return;
+      }
+      await serveFile(filePath, res);
+    }],
+    [/^\/(.+)$/, async (_req, res, match) => {
+      const filePath = safePath(staticRoot, match[1]);
+      if (!filePath) {
+        res.writeHead(403);
+        res.end("Forbidden");
+        return;
+      }
+      await serveFile(filePath, res);
+    }],
+  ];
 
   const server = createServer(async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -51,60 +150,43 @@ export function startServer(resolved: ResolvedManifest, port: number): void {
       return;
     }
 
-    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Cache-Control", cacheControl);
 
     const url = new URL(req.url || "/", `http://localhost:${port}`);
     const pathname = decodeURIComponent(url.pathname);
 
-    if (pathname === "/manifest.json") {
-      res.setHeader("Content-Type", "application/json");
-      res.writeHead(200);
-      res.end(manifestJson);
-      return;
-    }
-
-    const pluginMatch = pathname.match(/^\/p\/(\d+)\/(.+)$/);
-    if (pluginMatch) {
-      const idx = parseInt(pluginMatch[1], 10);
-      const plugin = plugins[idx];
-      if (!plugin) {
-        res.writeHead(404);
-        res.end("Plugin not found");
+    for (const [pattern, handler] of routes) {
+      const match = pattern.exec(pathname);
+      if (match) {
+        await handler(req, res, match);
         return;
       }
-      const filePath = safePath(plugin.localDir, pluginMatch[2]);
-      if (!filePath) {
-        res.writeHead(403);
-        res.end("Forbidden");
-        return;
-      }
-      await serveFile(filePath, res);
-      return;
     }
 
-    if (pathname === "/") {
-      res.writeHead(404);
-      res.end("Not found");
-      return;
-    }
-
-    const filePath = safePath(staticRoot, pathname.slice(1));
-    if (!filePath) {
-      res.writeHead(403);
-      res.end("Forbidden");
-      return;
-    }
-    await serveFile(filePath, res);
+    res.writeHead(404);
+    res.end("Not found");
   });
 
   server.listen(port, () => {
     console.log(`mediafuse serving on http://localhost:${port}`);
-    console.log(`manifest: http://localhost:${port}/manifest.json`);
     for (const plugin of plugins) {
       const name = plugin.entry.name || `plugin-${plugin.index}`;
       console.log(`${name}: ${plugin.entry.src}`);
     }
   });
+}
+
+function rewriteManifestUrls(
+  manifest: ResolvedManifest["manifest"],
+  base: string,
+): ResolvedManifest["manifest"] {
+  return {
+    ...manifest,
+    plugins: manifest.plugins.map((p) => ({
+      ...p,
+      src: `${base}${p.src}`,
+    })),
+  };
 }
 
 function safePath(root: string, requested: string): string | null {
@@ -120,7 +202,7 @@ function safePath(root: string, requested: string): string | null {
 
 async function serveFile(
   filePath: string,
-  res: import("node:http").ServerResponse,
+  res: ServerResponse,
 ): Promise<void> {
   if (!existsSync(filePath)) {
     res.writeHead(404);
@@ -150,7 +232,7 @@ async function serveFile(
 async function serveTranspiled(
   filePath: string,
   ext: string,
-  res: import("node:http").ServerResponse,
+  res: ServerResponse,
 ): Promise<void> {
   try {
     const source = readFileSync(filePath, "utf-8");
