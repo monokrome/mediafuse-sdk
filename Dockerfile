@@ -14,5 +14,8 @@ COPY --from=build /build/package.json /build/pnpm-lock.yaml /build/pnpm-workspac
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=build /build/dist ./dist
 
+RUN mkdir -p /opt/mediafuse
+VOLUME /opt/mediafuse
+
 EXPOSE 8000
-ENTRYPOINT ["node", "dist/cli/index.js"]
+ENTRYPOINT ["node", "dist/cli/index.js", "--data", "/opt/mediafuse"]
