@@ -30,15 +30,26 @@ export function resolveManifest(
   const discovered = discoverPlugins(searchPaths);
   const entries = normalizeEntries(raw.plugins);
 
+  const localPlugins: ResolvedPlugin[] = [];
+
   const plugins = entries.map((entry, i) => {
     const filePath = resolvePluginSrc(entry, manifestDir, discovered);
+
+    // Remote URLs are kept as-is — no local serving needed
+    if (filePath.startsWith("https://") || filePath.startsWith("http://")) {
+      const mergedEntry = mergeMetadata(entry, filePath, discovered);
+      return { entry: mergedEntry, localDir: "", filename: "", index: i };
+    }
+
     const localDir = dirname(filePath);
     const filename = basename(filePath);
 
     const mergedEntry = mergeMetadata(entry, filePath, discovered);
     mergedEntry.src = `${baseUrl}/p/${i}/${filename}`;
 
-    return { entry: mergedEntry, localDir, filename, index: i };
+    const resolved = { entry: mergedEntry, localDir, filename, index: i };
+    localPlugins.push(resolved);
+    return resolved;
   });
 
   const config = rewriteConfigPaths(raw.config || {}, manifestDir, baseUrl);
@@ -147,6 +158,11 @@ function resolvePluginSrc(
   discovered: Map<string, DiscoveredPlugin>,
 ): string {
   const src = entry.src;
+
+  // Already a full URL — leave as-is
+  if (src.startsWith("https://") || src.startsWith("http://")) {
+    return src;
+  }
 
   // Relative or absolute path
   if (src.startsWith("./") || src.startsWith("../") || src.startsWith("/")) {

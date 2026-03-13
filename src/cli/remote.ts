@@ -105,7 +105,10 @@ export async function materializeRemote(ref: RemoteRef): Promise<string> {
   const tmpDir = await mkdtemp(join(tmpdir(), "mediafuse-"));
 
   try {
-    await execFile("git", ["clone", "--depth", "1", ref.url, tmpDir]);
+    await execFile("git", ["clone", "--depth", "1", ref.url, tmpDir], {
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "" },
+      timeout: 30_000,
+    });
   } catch (err) {
     const msg = err instanceof Error ? (err as Error & { stderr?: string }).stderr || err.message : String(err);
     throw new Error(`Failed to clone ${ref.url}: ${msg}`);
