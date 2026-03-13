@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import { parseArgs } from "node:util";
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
-import { resolveManifest } from "./resolve.js";
+import { resolveManifest, findManifestEntry } from "./resolve.js";
 import { startServer } from "./server.js";
-import { resolveSource, findManifestInDir } from "./remote.js";
+import { resolveRef, setCacheDir } from "./remote.js";
 
 const USAGE = `Usage: mediafuse [-p path ...] [--port N] [source]
 
@@ -27,12 +27,16 @@ Options:
   -p, --plugin path   Plugin search path (repeatable)
                        Can be a directory, file, or remote repo
       --port N        Port to listen on (default: 8000)
+      --data D   Directory for cloned repos and fetched files (default: system temp)
+      --cache         Enable browser caching (sends Cache-Control: public, max-age=300)
   -h, --help          Show this help`;
 
 const { values, positionals } = parseArgs({
   options: {
     plugin: { type: "string", short: "p", multiple: true, default: [] },
     port: { type: "string", default: "8000" },
+    "data": { type: "string" },
+    cache: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
   allowPositionals: true,
@@ -49,8 +53,12 @@ if (positionals.length > 1) {
 }
 
 async function main(): Promise<void> {
+  if (values["data"]) {
+    setCacheDir(values["data"]);
+  }
+
   const manifestPath = positionals.length === 1
-    ? await resolveManifestSource(positionals[0])
+    ? await resolveRef(positionals[0], findManifestEntry)
     : findManifestLocal();
 
   if (!existsSync(manifestPath)) {
@@ -63,27 +71,11 @@ async function main(): Promise<void> {
   const port = parseInt(values.port as string, 10);
 
   const searchPaths = await Promise.all(
-    (values.plugin as string[]).map(async (p) => resolve(await resolveSource(p))),
+    (values.plugin as string[]).map(async (p) => resolve(await resolveRef(p))),
   );
 
-  const resolved = resolveManifest(manifestData, manifestDir, searchPaths, port);
-  startServer(resolved, port);
-}
-
-async function resolveManifestSource(input: string): Promise<string> {
-  const localPath = await resolveSource(input);
-  const resolved = resolve(localPath);
-
-  if (existsSync(resolved) && statSync(resolved).isDirectory()) {
-    const manifest = findManifestInDir(resolved);
-    if (!manifest) {
-      console.error(`No manifest.json found in ${resolved}`);
-      process.exit(1);
-    }
-    return manifest;
-  }
-
-  return resolved;
+  const resolved = await resolveManifest(manifestData, manifestDir, searchPaths);
+  startServer(resolved, port, { cache: values.cache as boolean });
 }
 
 function findManifestLocal(): string {

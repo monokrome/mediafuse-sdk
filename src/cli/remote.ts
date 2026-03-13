@@ -1,11 +1,16 @@
 import { execFile as execFileCb } from "node:child_process";
-import { mkdtemp } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { mkdirSync, existsSync, statSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { promisify } from "node:util";
 
 const execFile = promisify(execFileCb);
+
+let cacheDir = tmpdir();
+
+export function setCacheDir(dir: string): void {
+  cacheDir = dir;
+}
 
 const HOSTS: Record<string, string> = {
   "github.com": "https://github.com",
@@ -62,10 +67,14 @@ function parseUrl(url: string): RemoteRef | null {
   const segments = parsed.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/");
   if (segments.length < 2) return null;
 
-  const [owner, repo] = segments;
   const host = parsed.hostname;
   const base = HOSTS[host] ?? `https://${host}`;
 
+  // Only treat as a git repo if the path looks like owner/repo (2 segments)
+  // not a deep file path like /gh/user/repo@v/plugins/file.js
+  if (segments.length !== 2) return null;
+
+  const [owner, repo] = segments;
   return { host, owner, repo, url: `${base}/${owner}/${repo}.git` };
 }
 
@@ -96,17 +105,43 @@ function isBareShorthand(input: string): boolean {
   return true;
 }
 
-const cloneCache = new Map<string, string>();
+const REFRESH_INTERVAL = 30_000;
+const lastChecked = new Map<string, number>();
+
+function repoDir(ref: RemoteRef): string {
+  return join(cacheDir, "repos", ref.host, ref.owner, ref.repo);
+}
 
 export async function materializeRemote(ref: RemoteRef): Promise<string> {
-  const cached = cloneCache.get(ref.url);
-  if (cached) return cached;
+  const dir = repoDir(ref);
+  const now = Date.now();
+  const last = lastChecked.get(ref.url);
 
-  const tmpDir = await mkdtemp(join(tmpdir(), "mediafuse-"));
+  if (last && now - last < REFRESH_INTERVAL) {
+    return dir;
+  }
+
+  const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "" };
+
+  if (existsSync(join(dir, ".git"))) {
+    lastChecked.set(ref.url, now);
+    try {
+      await execFile("git", ["pull", "--ff-only"], {
+        cwd: dir,
+        env: gitEnv,
+        timeout: 30_000,
+      });
+    } catch {
+      // pull failed (offline, force-pushed, etc.) — use what we have
+    }
+    return dir;
+  }
+
+  mkdirSync(dir, { recursive: true });
 
   try {
-    await execFile("git", ["clone", "--depth", "1", ref.url, tmpDir], {
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "" },
+    await execFile("git", ["clone", "--depth", "1", ref.url, dir], {
+      env: gitEnv,
       timeout: 30_000,
     });
   } catch (err) {
@@ -114,18 +149,89 @@ export async function materializeRemote(ref: RemoteRef): Promise<string> {
     throw new Error(`Failed to clone ${ref.url}: ${msg}`);
   }
 
-  cloneCache.set(ref.url, tmpDir);
-  return tmpDir;
+  lastChecked.set(ref.url, now);
+  return dir;
 }
 
-export async function resolveSource(input: string): Promise<string> {
+export type EntryFinder = (dir: string) => string | null;
+
+/**
+ * Resolve any input reference to a local file path.
+ *
+ * Handles: remote refs (owner/repo, github:owner/repo, full git URLs),
+ * plain URLs (CDN links), and local paths.
+ *
+ * When findEntry is provided and the result is a directory,
+ * it's called to locate the relevant file within it.
+ */
+export async function resolveRef(
+  input: string,
+  findEntry?: EntryFinder,
+): Promise<string> {
   const ref = parseRemoteRef(input);
-  if (!ref) return input;
-  return materializeRemote(ref);
+  if (ref) {
+    const dir = await materializeRemote(ref);
+    return findEntry ? requireEntry(findEntry, dir, ref.url) : dir;
+  }
+
+  if (input.startsWith("https://") || input.startsWith("http://")) {
+    return fetchRemoteFile(input);
+  }
+
+  if (findEntry && existsSync(input) && statSync(input).isDirectory()) {
+    return requireEntry(findEntry, input, input);
+  }
+
+  return input;
+}
+
+function requireEntry(findEntry: EntryFinder, dir: string, source: string): string {
+  const entry = findEntry(dir);
+  if (!entry) throw new Error(`No entry found in ${source}`);
+  return entry;
+}
+
+// Back-compat aliases — these are thin wrappers around resolveRef
+export async function resolveSource(input: string): Promise<string> {
+  return resolveRef(input);
 }
 
 export function findManifestInDir(dir: string): string | null {
   const manifestJson = join(dir, "manifest.json");
   if (existsSync(manifestJson)) return manifestJson;
   return null;
+}
+
+function fetchDir(url: string): string {
+  const parsed = new URL(url);
+  const pathPart = parsed.pathname.replace(/^\//, "").replace(/\//g, "_");
+  return join(cacheDir, "fetch", parsed.hostname, pathPart);
+}
+
+export async function fetchRemoteFile(url: string): Promise<string> {
+  const dir = fetchDir(url);
+  const filename = basename(new URL(url).pathname) || "index.js";
+  const filePath = join(dir, filename);
+
+  const now = Date.now();
+  const last = lastChecked.get(url);
+
+  if (last && now - last < REFRESH_INTERVAL && existsSync(filePath)) {
+    return filePath;
+  }
+
+  mkdirSync(dir, { recursive: true });
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    if (existsSync(filePath)) {
+      lastChecked.set(url, now);
+      return filePath;
+    }
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  }
+
+  writeFileSync(filePath, await response.text());
+  lastChecked.set(url, now);
+  return filePath;
 }

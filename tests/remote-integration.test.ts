@@ -6,9 +6,9 @@ import { promisify } from "node:util";
 import {
   parseRemoteRef,
   materializeRemote,
-  resolveSource,
-  findManifestInDir,
+  resolveRef,
 } from "../src/cli/remote.js";
+import { findManifestEntry } from "../src/cli/resolve.js";
 
 const execFile = promisify(execFileCb);
 
@@ -64,17 +64,17 @@ describe("materializeRemote", () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveSource
+// resolveRef
 // ---------------------------------------------------------------------------
 
-describe("resolveSource", () => {
+describe("resolveRef", () => {
   it("returns local paths unchanged", async () => {
-    const result = await resolveSource("./local/path");
+    const result = await resolveRef("./local/path");
     expect(result).toBe("./local/path");
   });
 
   it("clones remote refs and returns local path", async () => {
-    const dir = await resolveSource("monokrome/mediafuse-overlay");
+    const dir = await resolveRef("monokrome/mediafuse-overlay");
     track(dir);
     expect(existsSync(dir)).toBe(true);
     expect(existsSync(join(dir, "manifest.json"))).toBe(true);
@@ -85,18 +85,18 @@ describe("resolveSource", () => {
 // findManifestInDir
 // ---------------------------------------------------------------------------
 
-describe("findManifestInDir", () => {
+describe("findManifestEntry", () => {
   it("finds manifest.json in a cloned repo", async () => {
-    const dir = await resolveSource("monokrome/mediafuse-overlay");
+    const dir = await resolveRef("monokrome/mediafuse-overlay");
     track(dir);
-    const manifest = findManifestInDir(dir);
+    const manifest = findManifestEntry(dir);
     expect(manifest).toBe(join(dir, "manifest.json"));
   }, 30_000);
 
   it("returns null for directory without manifest", async () => {
-    const dir = await resolveSource("monokrome/mediafuse-sdk");
+    const dir = await resolveRef("monokrome/mediafuse-sdk");
     track(dir);
-    const manifest = findManifestInDir(dir);
+    const manifest = findManifestEntry(dir);
     expect(manifest).toBeNull();
   }, 30_000);
 });
@@ -142,7 +142,7 @@ describe("CLI end-to-end", () => {
       });
 
       // Fetch the manifest
-      const res = await fetch(`http://localhost:${port}/manifest.json`);
+      const res = await fetch(`http://localhost:${port}/`);
       expect(res.ok).toBe(true);
 
       const manifest = await res.json();
@@ -150,13 +150,10 @@ describe("CLI end-to-end", () => {
       expect(manifest.plugins).toBeDefined();
       expect(Array.isArray(manifest.plugins)).toBe(true);
 
-      // Plugin URLs should be either rewritten to localhost (local plugins)
-      // or preserved as remote URLs (https:// plugins from the manifest)
+      // All plugin URLs should be rewritten to localhost
       for (const plugin of manifest.plugins) {
         const src = typeof plugin === "string" ? plugin : plugin.src;
-        const isLocal = src.includes(`http://localhost:${port}`);
-        const isRemote = src.startsWith("https://") || src.startsWith("http://");
-        expect(isLocal || isRemote).toBe(true);
+        expect(src).toContain(`http://localhost:${port}`);
       }
     } finally {
       child.kill();
