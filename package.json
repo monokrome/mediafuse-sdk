@@ -41,8 +41,5 @@
   "dependencies": {
     "esbuild": "^0.27.3"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
-  },
   "packageManager": "pnpm@10.28.0"
 }
