@@ -3,9 +3,8 @@ import * as sdk from "../src/index.js";
 import * as testing from "../src/testing.js";
 
 describe("public API surface", () => {
-  it("exports no runtime values from main entry (types-only)", () => {
-    const exports = Object.keys(sdk);
-    expect(exports).toEqual([]);
+  it("exports createLoader from main entry", () => {
+    expect(sdk.createLoader).toBeTypeOf("function");
   });
 
   it("exports createTestHarness from testing entry", () => {

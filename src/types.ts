@@ -106,8 +106,23 @@ export type RegisterBlockTypeFn = (
   renderer: BlockTypeRenderer,
 ) => void;
 
+export type LoadType = "source" | "json" | "css" | "url";
+
+export type LoadResult<T extends LoadType | undefined = undefined> =
+  T extends "source" ? Record<string, unknown> :
+  T extends "json" ? unknown :
+  T extends "css" ? string :
+  T extends "url" ? string :
+  Record<string, unknown> | string | unknown;
+
+export type LoadFn = <T extends LoadType | undefined = undefined>(
+  specifier: string,
+  type?: T,
+) => Promise<LoadResult<T>>;
+
 export interface PluginContext {
   register: RegisterFn;
   registerBlockType: RegisterBlockTypeFn;
   manifest: PluginManifest;
+  load: LoadFn;
 }

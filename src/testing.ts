@@ -95,7 +95,7 @@ export function createTestHarness(
 
   const definePlugin: DefinePluginFn = (name, setup) => {
     capturedName = name;
-    setup({ register, registerBlockType: () => {}, manifest });
+    setup({ register, registerBlockType: () => {}, manifest, load: () => Promise.reject(new Error("load() not available in tests")) });
   };
 
   const pluginFn = typeof plugin === "function" ? plugin : plugin.default;

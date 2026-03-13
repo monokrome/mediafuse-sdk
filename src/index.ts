@@ -20,5 +20,10 @@ export type {
   PluginManifest,
   RegisterFn,
   RegisterBlockTypeFn,
+  LoadType,
+  LoadResult,
+  LoadFn,
   PluginContext,
 } from "./types.js";
+
+export { createLoader } from "./loader.js";
