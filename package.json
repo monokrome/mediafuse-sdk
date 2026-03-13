@@ -22,7 +22,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "pnpm exec tsc",
+    "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "pnpm run build"
