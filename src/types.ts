@@ -52,6 +52,8 @@ export interface PluginEntry {
 export interface BlockPosition {
   x?: number | string;
   y?: number | string;
+  width?: number | string;
+  height?: number | string;
   anchor?: {
     x?: "left" | "center" | "right";
     y?: "top" | "center" | "bottom";
