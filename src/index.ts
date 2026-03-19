@@ -15,6 +15,7 @@ export type {
   BlockCondition,
   BlockConditions,
   BlockAnimation,
+  BlockGroup,
   BlockTypeRenderer,
   Block,
   PluginManifest,

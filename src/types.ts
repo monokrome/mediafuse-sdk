@@ -81,6 +81,14 @@ export type BlockTypeRenderer<T = unknown> = (
   context: Record<string, unknown>,
 ) => T;
 
+export interface BlockGroup {
+  limit: number;
+  direction?: "vertical" | "horizontal";
+  gap?: number;
+  order?: string[];
+  evict?: string[];
+}
+
 export interface Block {
   id: string;
   type: string;
@@ -88,6 +96,7 @@ export interface Block {
   options: Record<string, unknown>;
   conditions?: BlockConditions;
   animation?: BlockAnimation;
+  group?: BlockGroup;
 }
 
 export interface PluginManifest {
