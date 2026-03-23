@@ -65,9 +65,11 @@ export interface BlockCondition {
   duration?: number;
 }
 
+export type BlockConditionEntry = BlockCondition | string;
+
 export interface BlockConditions {
-  enter?: BlockCondition[];
-  exit?: BlockCondition[];
+  enter?: BlockConditionEntry[];
+  exit?: BlockConditionEntry[];
 }
 
 export interface BlockAnimation {

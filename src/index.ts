@@ -13,6 +13,7 @@ export type {
   PluginEntry,
   BlockPosition,
   BlockCondition,
+  BlockConditionEntry,
   BlockConditions,
   BlockAnimation,
   BlockGroup,
