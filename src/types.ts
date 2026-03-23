@@ -117,6 +117,25 @@ export type RegisterBlockTypeFn = (
   renderer: BlockTypeRenderer,
 ) => void;
 
+export type EventFieldType = "string" | "number" | "boolean";
+
+export interface EventFieldSchema {
+  type: EventFieldType;
+  label?: string;
+  required?: boolean;
+  default?: string | number | boolean;
+}
+
+export interface EventSchema {
+  label?: string;
+  fields: Record<string, EventFieldSchema>;
+}
+
+export type RegisterEventFn = (
+  event: string,
+  schema: EventSchema,
+) => void;
+
 export type LoadType = "source" | "json" | "css" | "url";
 
 export type LoadResult<T extends LoadType | undefined = undefined> =
@@ -134,6 +153,7 @@ export type LoadFn = <T extends LoadType | undefined = undefined>(
 export interface PluginContext {
   register: RegisterFn;
   registerBlockType: RegisterBlockTypeFn;
+  registerEvent: RegisterEventFn;
   manifest: PluginManifest;
   load: LoadFn;
 }

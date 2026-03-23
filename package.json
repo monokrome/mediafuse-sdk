@@ -1,6 +1,6 @@
 {
   "name": "mediafuse",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Plugin SDK for MediaFuse stream overlays",
   "type": "module",
   "main": "./dist/index.js",
