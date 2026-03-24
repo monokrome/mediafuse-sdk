@@ -72,10 +72,14 @@ export interface BlockConditions {
   exit?: BlockConditionEntry[];
 }
 
-export interface BlockAnimation {
-  enter?: string;
-  exit?: string;
+export interface AnimationConfig {
+  name: string;
   duration?: number;
+}
+
+export interface BlockAnimation {
+  enter?: AnimationConfig;
+  exit?: AnimationConfig;
 }
 
 export type BlockTypeRenderer<T = unknown> = (

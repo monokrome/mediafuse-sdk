@@ -15,6 +15,7 @@ export type {
   BlockCondition,
   BlockConditionEntry,
   BlockConditions,
+  AnimationConfig,
   BlockAnimation,
   BlockGroup,
   BlockTypeRenderer,
