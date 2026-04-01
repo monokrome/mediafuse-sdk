@@ -132,7 +132,12 @@ export async function materializeRemote(ref: RemoteRef): Promise<string> {
         timeout: 30_000,
       });
     } catch {
-      // pull failed (offline, force-pushed, etc.) — use what we have
+      try {
+        await execFile("git", ["fetch", "origin"], { cwd: dir, env: gitEnv, timeout: 30_000 });
+        await execFile("git", ["reset", "--hard", "origin/HEAD"], { cwd: dir, env: gitEnv, timeout: 10_000 });
+      } catch {
+        // offline — use what we have
+      }
     }
     return dir;
   }
