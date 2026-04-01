@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseRemoteRef } from "../src/cli/remote.js";
+import { parseRemoteRef, parseJsdelivrUrl } from "../src/cli/remote.js";
 
 describe("parseRemoteRef", () => {
   it("parses full GitHub HTTPS URL", () => {
@@ -98,5 +98,54 @@ describe("parseRemoteRef", () => {
 
   it("returns null for path with backslashes", () => {
     expect(parseRemoteRef("some\\windows\\path")).toBeNull();
+  });
+
+  it("returns null for jsdelivr deep path (not a 2-segment repo URL)", () => {
+    expect(parseRemoteRef("https://cdn.jsdelivr.net/gh/monokrome/mediafuse-plugins@main/plugins/debug/dist/debug.js")).toBeNull();
+  });
+});
+
+describe("parseJsdelivrUrl", () => {
+  it("parses jsdelivr GitHub URL with @main ref", () => {
+    const result = parseJsdelivrUrl("https://cdn.jsdelivr.net/gh/monokrome/mediafuse-plugins@main/plugins/debug/dist/debug.js");
+    expect(result).toEqual({
+      ref: {
+        host: "github.com",
+        owner: "monokrome",
+        repo: "mediafuse-plugins",
+        url: "https://github.com/monokrome/mediafuse-plugins.git",
+      },
+      filePath: "plugins/debug/dist/debug.js",
+    });
+  });
+
+  it("parses jsdelivr URL with version ref", () => {
+    const result = parseJsdelivrUrl("https://cdn.jsdelivr.net/gh/user/repo@v1.2.3/dist/index.js");
+    expect(result).toEqual({
+      ref: {
+        host: "github.com",
+        owner: "user",
+        repo: "repo",
+        url: "https://github.com/user/repo.git",
+      },
+      filePath: "dist/index.js",
+    });
+  });
+
+  it("parses jsdelivr URL with single file path", () => {
+    const result = parseJsdelivrUrl("https://cdn.jsdelivr.net/gh/owner/repo@latest/file.js");
+    expect(result?.filePath).toBe("file.js");
+  });
+
+  it("returns null for non-jsdelivr URL", () => {
+    expect(parseJsdelivrUrl("https://example.com/some/file.js")).toBeNull();
+  });
+
+  it("returns null for jsdelivr npm URL (not /gh/)", () => {
+    expect(parseJsdelivrUrl("https://cdn.jsdelivr.net/npm/p5@1/lib/p5.min.js")).toBeNull();
+  });
+
+  it("returns null for plain GitHub URL", () => {
+    expect(parseJsdelivrUrl("https://github.com/user/repo")).toBeNull();
   });
 });

@@ -33,6 +33,24 @@ export interface RemoteRef {
   url: string;
 }
 
+export interface RemoteFileRef {
+  ref: RemoteRef;
+  filePath: string;
+}
+
+export function parseJsdelivrUrl(url: string): RemoteFileRef | null {
+  const match = url.match(/^https?:\/\/cdn\.jsdelivr\.net\/gh\/([^/]+)\/([^@]+)@[^/]*\/(.+)$/);
+  if (!match) return null;
+  const [, owner, repo, filePath] = match;
+  const ref: RemoteRef = {
+    host: "github.com",
+    owner,
+    repo,
+    url: `https://github.com/${owner}/${repo}.git`,
+  };
+  return { ref, filePath };
+}
+
 export function parseRemoteRef(input: string): RemoteRef | null {
   if (input.startsWith("https://")) {
     return parseUrl(input);
@@ -177,6 +195,12 @@ export async function resolveRef(
   if (ref) {
     const dir = await materializeRemote(ref);
     return findEntry ? requireEntry(findEntry, dir, ref.url) : dir;
+  }
+
+  const cdnRef = parseJsdelivrUrl(input);
+  if (cdnRef) {
+    const dir = await materializeRemote(cdnRef.ref);
+    return join(dir, cdnRef.filePath);
   }
 
   if (input.startsWith("https://") || input.startsWith("http://")) {
