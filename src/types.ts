@@ -13,6 +13,7 @@ export type PluginEnvironment = "overlay" | "dashboard";
 
 export type PluginEventMap = {
   message: StoredMessage | null;
+  messageActioned: number | null;
   command: { name: string; data: unknown };
   resize: { width: number; height: number };
   tick: number;
