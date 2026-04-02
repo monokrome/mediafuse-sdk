@@ -2,7 +2,7 @@ export interface StoredMessage<T = Record<string, unknown>> {
   type: string | null;
   data: T;
   timestamp: number;
-  durationMs: number | null;
+  duration: number | null;
 }
 
 export type MessageOf<T> = StoredMessage<T> & { type: string };
@@ -26,7 +26,7 @@ export interface CreateContext {
   container: HTMLDivElement | null;
   config: Record<string, unknown>;
   emit: (<E extends PluginEvent>(event: E, data: PluginEventMap[E]) => void) | null;
-  messageActioned: (durationMs: number | null) => void;
+  messageActioned: (duration: number | null) => void;
   environment: PluginEnvironment;
   dev: boolean;
 }
