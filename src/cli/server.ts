@@ -66,16 +66,19 @@ async function serveFile(filePath: string, res: ServerResponse): Promise<void> {
   }
 
   const contentType = MIME[ext] || "application/octet-stream";
-  res.setHeader("Content-Type", contentType);
-  res.writeHead(200);
-
   const stream = createReadStream(filePath);
-  stream.pipe(res);
   stream.on("error", function handleStreamError() {
     if (!res.headersSent) {
       res.writeHead(500);
+      res.end("Read error");
+    } else {
+      res.destroy();
     }
-    res.end("Read error");
+  });
+  stream.once("readable", function onReady() {
+    res.setHeader("Content-Type", contentType);
+    res.writeHead(200);
+    stream.pipe(res);
   });
 }
 
