@@ -162,18 +162,11 @@ async function materializeRemoteImpl(ref: RemoteRef): Promise<string> {
   if (existsSync(join(dir, ".git"))) {
     lastChecked.set(ref.url, now);
     try {
-      await execFile("git", ["pull", "--ff-only"], {
-        cwd: dir,
-        env: gitEnv,
-        timeout: 30_000,
-      });
-    } catch {
-      try {
-        await execFile("git", ["fetch", "origin"], { cwd: dir, env: gitEnv, timeout: 30_000 });
-        await execFile("git", ["reset", "--hard", "origin/HEAD"], { cwd: dir, env: gitEnv, timeout: 10_000 });
-      } catch {
-        // offline — use what we have
-      }
+      await execFile("git", ["fetch", "origin"], { cwd: dir, env: gitEnv, timeout: 30_000 });
+      await execFile("git", ["reset", "--hard", "origin/HEAD"], { cwd: dir, env: gitEnv, timeout: 10_000 });
+    } catch (err) {
+      const msg = err instanceof Error ? (err as Error & { stderr?: string }).stderr || err.message : String(err);
+      console.error(`[mediafuse] Failed to update ${ref.owner}/${ref.repo}: ${msg}`);
     }
     return dir;
   }
