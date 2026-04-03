@@ -125,12 +125,22 @@ function isBareShorthand(input: string): boolean {
 
 const REFRESH_INTERVAL = 30_000;
 const lastChecked = new Map<string, number>();
+const inflight = new Map<string, Promise<string>>();
 
 function repoDir(ref: RemoteRef): string {
   return join(cacheDir, "repos", ref.host, ref.owner, ref.repo);
 }
 
-export async function materializeRemote(ref: RemoteRef): Promise<string> {
+export function materializeRemote(ref: RemoteRef): Promise<string> {
+  const existing = inflight.get(ref.url);
+  if (existing) return existing;
+
+  const p = materializeRemoteImpl(ref).finally(() => inflight.delete(ref.url));
+  inflight.set(ref.url, p);
+  return p;
+}
+
+async function materializeRemoteImpl(ref: RemoteRef): Promise<string> {
   const dir = repoDir(ref);
   const now = Date.now();
   const last = lastChecked.get(ref.url);
