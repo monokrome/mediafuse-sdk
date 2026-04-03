@@ -1,5 +1,5 @@
 import { execFile as execFileCb } from "node:child_process";
-import { mkdirSync, existsSync, statSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, existsSync, statSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
 import { promisify } from "node:util";
@@ -142,6 +142,14 @@ export async function materializeRemote(ref: RemoteRef): Promise<string> {
   const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "" };
 
   if (existsSync(join(dir, ".git"))) {
+    try {
+      await execFile("git", ["rev-parse", "--git-dir"], { cwd: dir, env: gitEnv, timeout: 5_000 });
+    } catch {
+      try { rmSync(dir, { recursive: true, force: true }); } catch { /* locked — fall through to clone error */ }
+    }
+  }
+
+  if (existsSync(join(dir, ".git"))) {
     lastChecked.set(ref.url, now);
     try {
       await execFile("git", ["pull", "--ff-only"], {
@@ -158,6 +166,11 @@ export async function materializeRemote(ref: RemoteRef): Promise<string> {
       }
     }
     return dir;
+  }
+
+  mkdirSync(join(dir, ".."), { recursive: true });
+  if (existsSync(dir)) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch { /* locked — clone will fail with clear error */ }
   }
 
   try {
