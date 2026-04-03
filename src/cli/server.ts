@@ -4,7 +4,7 @@ import { join, extname, resolve, dirname, basename, sep } from "node:path";
 import { createHash } from "node:crypto";
 import { transform } from "esbuild";
 import type { ResolvedManifest } from "./resolve.js";
-import { resolveRef } from "./remote.js";
+import { resolveRef, refreshDir } from "./remote.js";
 
 const MIME: Record<string, string> = {
   ".js": "application/javascript",
@@ -187,6 +187,7 @@ export function startServer(resolved: ResolvedManifest, port: number, options: S
       res.end("Plugin not found");
       return;
     }
+    await refreshDir(plugin.localDir);
     const filePath = safePath(plugin.localDir, match[2]);
     if (!filePath) {
       res.writeHead(403);
@@ -197,6 +198,7 @@ export function startServer(resolved: ResolvedManifest, port: number, options: S
   }
 
   async function serveStatic(_req: IncomingMessage, res: ServerResponse, match: RegExpExecArray): Promise<void> {
+    await refreshDir(staticRoot);
     const filePath = safePath(staticRoot, match[1]);
     if (!filePath) {
       res.writeHead(403);

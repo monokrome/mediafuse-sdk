@@ -1,7 +1,7 @@
 import { execFile as execFileCb } from "node:child_process";
 import { mkdirSync, existsSync, statSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, basename } from "node:path";
+import { join, basename, sep } from "node:path";
 import { promisify } from "node:util";
 
 const execFile = promisify(execFileCb);
@@ -126,6 +126,16 @@ function isBareShorthand(input: string): boolean {
 const REFRESH_INTERVAL = 30_000;
 const lastChecked = new Map<string, number>();
 const inflight = new Map<string, Promise<string>>();
+const dirToRef = new Map<string, RemoteRef>();
+
+export function refreshDir(dir: string): Promise<void> {
+  for (const [trackedDir, ref] of dirToRef) {
+    if (dir === trackedDir || dir.startsWith(trackedDir + sep)) {
+      return materializeRemote(ref).then(() => {});
+    }
+  }
+  return Promise.resolve();
+}
 
 function repoDir(ref: RemoteRef): string {
   return join(cacheDir, "repos", ref.host, ref.owner, ref.repo);
@@ -144,6 +154,8 @@ async function materializeRemoteImpl(ref: RemoteRef): Promise<string> {
   const dir = repoDir(ref);
   const now = Date.now();
   const last = lastChecked.get(ref.url);
+
+  dirToRef.set(dir, ref);
 
   if (last && now - last < REFRESH_INTERVAL) {
     return dir;
