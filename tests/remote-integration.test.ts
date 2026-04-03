@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, rmSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 import {
@@ -111,9 +112,12 @@ describe("CLI end-to-end", () => {
 
     const port = 18234 + Math.floor(Math.random() * 1000);
     const { spawn } = await import("node:child_process");
+    const cliDataDir = mkdtempSync(join(tmpdir(), "mediafuse-cli-test-"));
+    clonedDirs.push(cliDataDir);
+
     const child = spawn(
       "node",
-      [cliPath, "--port", String(port), "monokrome/mediafuse-overlay"],
+      [cliPath, "--port", String(port), "--data", cliDataDir, "monokrome/mediafuse-overlay"],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
 
