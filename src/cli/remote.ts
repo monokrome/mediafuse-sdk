@@ -160,8 +160,6 @@ export async function materializeRemote(ref: RemoteRef): Promise<string> {
     return dir;
   }
 
-  mkdirSync(dir, { recursive: true });
-
   try {
     await execFile("git", ["clone", "--depth", "1", ref.url, dir], {
       env: gitEnv,
